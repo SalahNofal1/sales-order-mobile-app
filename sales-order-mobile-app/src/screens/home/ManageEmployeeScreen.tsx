@@ -6,6 +6,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Image,
 } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
@@ -14,65 +15,98 @@ import { COLORS } from '../../constants/colors';
 
 import Navbar from '../../components/common/Navbar';
 import Footer from '../../navigation/Footer';
-import { type Employee, getEmployees } from '../../services/employeeService';
+
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../../services/firebase/config';
 
 const ManageEmployeeScreen = () => {
   const router = useRouter();
-  const [data, setData] = useState<Employee[]>([]);
+  const [data, setData] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchEmployees = async () => {
-      const list = await getEmployees();
-      setData(list);
+      try {
+        const snapshot = await getDocs(collection(db, 'employees'));
+
+        const list: any[] = [];
+
+        snapshot.forEach((doc) => {
+          list.push({
+            id: doc.id,
+            ...doc.data(),
+          });
+        });
+
+        setData(list);
+      } catch (error) {
+        console.log(error);
+      }
     };
 
     fetchEmployees();
   }, []);
 
   return (
-    <>
+    <View style={styles.container}>
+
       <Navbar title="Employees" />
 
-      <View style={styles.container}>
+      <FlatList
+        data={data}
+        keyExtractor={(item: any) => item.id}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ padding: 15, paddingBottom: 100 }}
 
-        <View style={styles.searchContainer}>
-          <Ionicons name="search-outline" size={18} color={COLORS.textSecondary} />
-          <TextInput placeholder="Search" style={styles.searchInput} />
-        </View>
-
-        <TouchableOpacity style={styles.addButton} onPress={() => router.push('/profile')}>
-          <Text style={styles.addText}>Add Employee</Text>
-        </TouchableOpacity>
-
-        <FlatList
-          data={data}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View style={styles.card}>
-
-              <View style={styles.avatar} />
-
-              <View style={styles.info}>
-                <Text style={styles.name}>
-                  {item.fullName || item.name || 'No Name'}
-                </Text>
-                <Text style={styles.job}>
-                  {item.jobType || item.job || 'No job'}
-                </Text>
-              </View>
-
-              <TouchableOpacity onPress={() => router.push(`/edit?id=${item.id}`)}>
-                <Ionicons name="create-outline" size={22} color={COLORS.primary} />
-              </TouchableOpacity>
-
+        ListHeaderComponent={
+          <>
+            <View style={styles.searchContainer}>
+              <Ionicons name="search-outline" size={18} color={COLORS.textSecondary} />
+              <TextInput placeholder="Search..." style={styles.searchInput} />
             </View>
-          )}
-        />
 
-      </View>
+            <TouchableOpacity style={styles.addButton}>
+              <Text style={styles.addText}>+ Add Employee</Text>
+            </TouchableOpacity>
+          </>
+        }
+
+        renderItem={({ item }: any) => (
+          <View style={styles.card}>
+
+            <Image
+              source={{
+                uri: item.image
+                  ? item.image
+                  : `https://i.pravatar.cc/150?u=${item.id}`,
+              }}
+              style={styles.avatar}
+            />
+
+            <View style={styles.info}>
+              <Text style={styles.name}>
+                {item.fullName || item.name || 'No Name'}
+              </Text>
+
+              <Text style={styles.job}>
+                {item.role || item.jobType || 'No job'}
+              </Text>
+            </View>
+
+            <TouchableOpacity onPress={() => router.push('/edit')}>
+              <Ionicons
+                name="create-outline"
+                size={22}
+                color={COLORS.primary}
+              />
+            </TouchableOpacity>
+
+          </View>
+        )}
+      />
 
       <Footer />
-    </>
+
+    </View>
   );
 };
 
@@ -82,16 +116,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-    padding: 15,
   },
 
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.accent,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    marginBottom: 10,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    marginBottom: 12,
   },
 
   searchInput: {
@@ -102,7 +135,7 @@ const styles = StyleSheet.create({
   addButton: {
     backgroundColor: COLORS.primary,
     padding: 14,
-    borderRadius: 12,
+    borderRadius: 14,
     marginBottom: 15,
   },
 
@@ -115,8 +148,8 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     backgroundColor: COLORS.surface,
-    padding: 12,
-    borderRadius: 16,
+    padding: 14,
+    borderRadius: 18,
     marginBottom: 12,
     alignItems: 'center',
     borderWidth: 1,
@@ -126,13 +159,12 @@ const styles = StyleSheet.create({
   avatar: {
     width: 50,
     height: 50,
-    backgroundColor: COLORS.secondary,
     borderRadius: 25,
   },
 
   info: {
     flex: 1,
-    marginLeft: 10,
+    marginLeft: 12,
   },
 
   name: {
