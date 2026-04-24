@@ -5,6 +5,7 @@ import {
     Image,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
@@ -17,13 +18,12 @@ import Navbar from '../src/components/Navbar';
 import {
     deleteProduct,
     getProducts,
-    updateProduct,
 } from '../src/services/productService';
 
 type Product = {
   id: string;
-  name: string;
-  price: number;
+  name?: string;
+  price?: number;
   description?: string;
   image?: string;
   quantity?: number;
@@ -31,20 +31,24 @@ type Product = {
 
 export default function ManageProductsScreen() {
   const router = useRouter();
+
   const [products, setProducts] = useState<Product[]>([]);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     fetchProducts();
   }, []);
 
   const fetchProducts = async () => {
-    const data = await getProducts();
-    setProducts(data as Product[]);
+    try {
+      const data = await getProducts();
+      setProducts(data as Product[]);
+    } catch (e) {
+      console.log(e);
+    }
   };
 
   const handleDelete = (id: string) => {
-    console.log('DELETE CLICKED');
-
     Alert.alert('Delete', 'Are you sure?', [
       { text: 'Cancel' },
       {
@@ -52,99 +56,69 @@ export default function ManageProductsScreen() {
         onPress: async () => {
           try {
             await deleteProduct(id);
-            setProducts(prev => prev.filter(p => p.id !== id));
+            fetchProducts();
           } catch (e) {
-            Alert.alert('Error deleting');
+            Alert.alert('Error deleting product');
           }
         },
       },
     ]);
   };
 
-  const increaseQty = async (item: Product) => {
-    await updateProduct(item.id, {
-      quantity: (item.quantity || 0) + 1,
-    });
-    fetchProducts();
-  };
+  const filteredProducts = products.filter((item) => {
+    const name = item.name || '';
+    return name.toLowerCase().includes(search.toLowerCase());
+  });
 
-  const decreaseQty = async (item: Product) => {
-    if ((item.quantity || 0) <= 0) return;
+  const renderItem = ({ item }: { item: Product }) => {
+    const imageUrl =
+      item.image && item.image.startsWith('http')
+        ? item.image
+        : 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
 
-    await updateProduct(item.id, {
-      quantity: (item.quantity || 0) - 1,
-    });
-    fetchProducts();
-  };
+    return (
+      <View style={styles.card}>
+        <View style={styles.left}>
+          <Image source={{ uri: imageUrl }} style={styles.image} />
 
-  const renderItem = ({ item }: { item: Product }) => (
-    <View style={styles.card}>
+          <View>
+            <Text style={styles.name}>{item.name || 'No Name'}</Text>
+            <Text style={styles.price}>${item.price || 0}</Text>
+            <Text style={styles.qty}>
+              Qty: {item.quantity ?? 0}
+            </Text>
+            <Text style={styles.desc}>
+              {item.description || 'No Description'}
+            </Text>
+          </View>
+        </View>
 
-      <View style={styles.left}>
-        <Image
-          source={{
-            uri:
-              item.image ||
-              'https://cdn-icons-png.flaticon.com/512/149/149071.png',
-          }}
-          style={styles.image}
-        />
+        <View style={styles.actions}>
+          <TouchableOpacity
+            onPress={() => router.push(`/edit-product/${item.id}`)}
+          >
+            <Text style={styles.edit}>✏️</Text>
+          </TouchableOpacity>
 
-        <View>
-          <Text style={styles.name}>{item.name}</Text>
-          <Text style={styles.price}>${item.price}</Text>
-
-          <Text style={styles.qty}>
-            Qty: {item.quantity ?? 0}
-          </Text>
-
-          <Text style={styles.desc}>
-            {item.description || 'No Description'}
-          </Text>
+          <TouchableOpacity onPress={() => handleDelete(item.id)}>
+            <Text style={styles.delete}>🗑️</Text>
+          </TouchableOpacity>
         </View>
       </View>
-
-      <View style={styles.actions}>
-
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => increaseQty(item)}
-        >
-          <Text style={styles.plus}>➕</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => decreaseQty(item)}
-        >
-          <Text style={styles.minus}>➖</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => router.push(`/edit-product/${item.id}`)}
-        >
-          <Text style={styles.edit}>✏️</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => handleDelete(item.id)}
-        >
-          <Text style={styles.delete}>🗑️</Text>
-        </TouchableOpacity>
-
-      </View>
-
-    </View>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>
-
       <Navbar title="Products" />
 
       <View style={styles.content}>
+        <TextInput
+          placeholder="Search product..."
+          value={search}
+          onChangeText={setSearch}
+          style={styles.search}
+        />
 
         <TouchableOpacity
           style={styles.addBtn}
@@ -154,11 +128,10 @@ export default function ManageProductsScreen() {
         </TouchableOpacity>
 
         <FlatList
-          data={products}
+          data={filteredProducts}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
         />
-
       </View>
 
       <Footer />
@@ -175,6 +148,15 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 15,
+  },
+
+  search: {
+    backgroundColor: '#fff',
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#FFD6E8',
   },
 
   addBtn: {
@@ -205,13 +187,13 @@ const styles = StyleSheet.create({
   left: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
   },
 
   image: {
     width: 50,
     height: 50,
     borderRadius: 10,
-    marginRight: 10,
   },
 
   name: {
@@ -224,7 +206,6 @@ const styles = StyleSheet.create({
 
   qty: {
     color: 'green',
-    fontSize: 12,
     fontWeight: 'bold',
   },
 
@@ -235,23 +216,7 @@ const styles = StyleSheet.create({
 
   actions: {
     flexDirection: 'row',
-    alignItems: 'center',
-  },
-
-  actionBtn: {
-    padding: 10,
-    marginHorizontal: 3,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    elevation: 3,
-  },
-
-  plus: {
-    fontSize: 18,
-  },
-
-  minus: {
-    fontSize: 18,
+    gap: 10,
   },
 
   edit: {
