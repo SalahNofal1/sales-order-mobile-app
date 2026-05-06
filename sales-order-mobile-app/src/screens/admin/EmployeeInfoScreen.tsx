@@ -5,7 +5,6 @@ import Navbar from '../../components/common/Navbar';
 import Footer from '../../navigation/Footer';
 import { COLORS } from '../../constants/colors';
 import { deleteEmployee, getEmployeeById, type Employee } from '../../services/employeeService';
-import { sendResetPassword } from '../../services/authService';
 import { useAuth } from '../../context/AuthContext';
 import { getUserProfile } from '../../services/userService';
 import { adminSetPasswordByEmail } from '../../services/functions/adminPasswordService';
@@ -53,20 +52,6 @@ export default function EmployeeInfoScreen() {
     };
     run();
   }, [user?.uid]);
-
-  const handleResetPassword = async () => {
-    const targetEmail = employee?.email?.trim();
-    if (!targetEmail) {
-      showMessage('Error', 'Employee email is missing.');
-      return;
-    }
-    try {
-      await sendResetPassword(targetEmail);
-      showMessage('Password Reset', `Reset email sent to:\n${targetEmail}`);
-    } catch (e: any) {
-      showMessage('Error', e?.message || 'Failed to send reset email.');
-    }
-  };
 
   const handleSetPassword = async () => {
     const targetEmail = employee?.email?.trim();
@@ -138,9 +123,6 @@ export default function EmployeeInfoScreen() {
                   <Pressable style={styles.setPasswordBtn} onPress={handleSetPassword}>
                     <Text style={styles.btnText}>Save Password</Text>
                   </Pressable>
-                  <Pressable style={styles.resetBtn} onPress={handleResetPassword}>
-                    <Text style={styles.btnText}>Send Reset Email</Text>
-                  </Pressable>
                 </View>
               </View>
             )}
@@ -188,6 +170,5 @@ const styles = StyleSheet.create({
   },
   passwordActions: { flexDirection: 'row', gap: 10, marginTop: 10 },
   setPasswordBtn: { flex: 1, backgroundColor: COLORS.primary, padding: 12, borderRadius: 12, alignItems: 'center' },
-  resetBtn: { flex: 1, backgroundColor: COLORS.secondary, padding: 12, borderRadius: 12, alignItems: 'center' },
 });
 
