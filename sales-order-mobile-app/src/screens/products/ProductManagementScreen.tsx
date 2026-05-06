@@ -19,6 +19,7 @@ import { COLORS } from '../../constants/colors';
 
 import Navbar from '../../components/common/Navbar';
 import Footer from '../../navigation/Footer';
+import { useToast } from '../../context/ToastContext';
 import {
   createProduct,
   deleteProduct,
@@ -29,6 +30,7 @@ import {
 
 const ProductManagementScreen = () => {
   const [data, setData] = useState<Product[]>([]);
+  const [search, setSearch] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
@@ -37,22 +39,27 @@ const ProductManagementScreen = () => {
   const [saving, setSaving] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
 
-  const showMessage = (title: string, message: string) => {
-    if (Platform.OS === 'web') {
-      window.alert(`${title}\n\n${message}`);
-      return;
-    }
-    Alert.alert(title, message);
-  };
+  const { showToast } = useToast();
+
+  const showMessage = useCallback(
+    (title: string, message: string, type: 'success' | 'error' | 'info' = 'info') => {
+      if (Platform.OS === 'web' && type === 'error') {
+        window.alert(`${title}\n\n${message}`);
+        return;
+      }
+      showToast({ type, title, message });
+    },
+    [showToast]
+  );
 
   const loadProducts = useCallback(async () => {
     try {
       const list = await getProducts();
       setData(list);
     } catch (error: any) {
-      showMessage('Error', error?.message || 'Failed to load products.');
+      showMessage('Error', error?.message || 'Failed to load products.', 'error');
     }
-  }, []);
+  }, [showMessage]);
 
   useEffect(() => {
     loadProducts();
@@ -61,7 +68,7 @@ const ProductManagementScreen = () => {
   const handlePickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      showMessage('Permission Required', 'Please allow gallery access to select images.');
+      showMessage('Permission Required', 'Please allow gallery access to select images.', 'info');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -75,13 +82,13 @@ const ProductManagementScreen = () => {
 
   const handleCreateProduct = async () => {
     if (!name.trim() || !price.trim()) {
-      showMessage('Missing Fields', 'Please enter product name and price.');
+      showMessage('Missing Fields', 'Please enter product name and price.', 'error');
       return;
     }
 
     const numericPrice = Number(price);
     if (Number.isNaN(numericPrice)) {
-      showMessage('Invalid Price', 'Price must be a valid number.');
+      showMessage('Invalid Price', 'Price must be a valid number.', 'error');
       return;
     }
 
@@ -109,10 +116,14 @@ const ProductManagementScreen = () => {
       setEditingProductId(null);
       setModalVisible(false);
       await loadProducts();
-      showMessage('Success', editingProductId ? 'Product updated successfully.' : 'Product added successfully.');
+      showMessage(
+        'Success',
+        editingProductId ? 'Product updated successfully.' : 'Product added successfully.',
+        'success'
+      );
     } catch (error: any) {
       console.log('Create product error:', error);
-      showMessage('Error', error?.message || 'Failed to save product or upload image.');
+      showMessage('Error', error?.message || 'Failed to save product or upload image.', 'error');
     } finally {
       setSaving(false);
     }
@@ -128,20 +139,49 @@ const ProductManagementScreen = () => {
   };
 
   const handleDeleteProduct = async (id: string) => {
-    try {
-      await deleteProduct(id);
-      await loadProducts();
-      showMessage('Success', 'Product deleted successfully.');
-    } catch (error: any) {
-      showMessage('Error', error?.message || 'Failed to delete product.');
+    const confirmDelete = async () => {
+      try {
+        await deleteProduct(id);
+        await loadProducts();
+        showMessage('Success', 'Product deleted successfully.', 'success');
+      } catch (error: any) {
+        showMessage('Error', error?.message || 'Failed to delete product.', 'error');
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      const ok = window.confirm('Are you sure you want to delete this product?');
+      if (ok) await confirmDelete();
+      return;
     }
+
+    Alert.alert('Delete', 'Are you sure?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Yes', style: 'destructive', onPress: () => confirmDelete() },
+    ]);
   };
+
+  const filteredData = data.filter((item) => {
+    const n = (item.name || '').toLowerCase();
+    return n.includes(search.trim().toLowerCase());
+  });
 
   return (
     <>
       <Navbar title="Products" />
 
       <View style={styles.container}>
+
+        <View style={styles.searchRow}>
+          <Ionicons name="search-outline" size={18} color={COLORS.textSecondary} />
+          <TextInput
+            placeholder="Search product..."
+            value={search}
+            onChangeText={setSearch}
+            style={styles.searchInput}
+            placeholderTextColor={COLORS.textSecondary}
+          />
+        </View>
 
         {/* Add Button */}
         <TouchableOpacity
@@ -160,12 +200,20 @@ const ProductManagementScreen = () => {
 
         {/* List */}
         <FlatList
-          data={data}
+          data={filteredData}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <View style={styles.card}>
 
-              <Image source={{ uri: item.image || 'https://via.placeholder.com/80' }} style={styles.image} />
+              <Image
+                source={{
+                  uri:
+                    item.image && item.image.startsWith('http')
+                      ? item.image
+                      : 'https://cdn-icons-png.flaticon.com/512/149/149071.png',
+                }}
+                style={styles.image}
+              />
 
               <View style={styles.info}>
                 <Text style={styles.name}>{item.name}</Text>
@@ -241,6 +289,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
     padding: 15,
+  },
+
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  searchInput: {
+    flex: 1,
+    padding: 10,
   },
 
   addButton: {

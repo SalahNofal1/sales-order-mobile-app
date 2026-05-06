@@ -13,9 +13,10 @@ export type UserProfileInput = {
 };
 
 export const createUserProfile = async (userId: string, data: UserProfileInput) => {
+  const normalizedRole = (data.role || 'sales').toLowerCase();
   await setDoc(doc(db, 'employees', userId), {
     ...data,
-    role: data.role || "sales",
+    role: normalizedRole,
     createdAt: serverTimestamp(),
   });
 };
@@ -27,5 +28,5 @@ export const getUserProfile = async (uid: string) => {
     return snapshot.data();
   }
 
-  throw new Error("Employee not found");
+  return null;
 };

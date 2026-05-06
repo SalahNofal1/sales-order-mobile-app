@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   KeyboardAvoidingView,
   Platform,
@@ -14,7 +13,8 @@ import {
 
 import { useRouter } from "expo-router";
 
-import { COLORS } from "../../../constants/colors";
+import { COLORS } from "../../constants/colors";
+import { useToast } from "../../context/ToastContext";
 import { login } from "../../services/authService";
 import { getUserProfile } from "../../services/userService";
 
@@ -25,6 +25,7 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
 
   const router = useRouter();
+  const { showToast } = useToast();
 
   const floatAnim = useRef(new Animated.Value(0)).current;
 
@@ -43,11 +44,11 @@ export default function LoginScreen() {
         }),
       ])
     ).start();
-  }, []);
+  }, [floatAnim]);
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert("Error", "Please enter email and password");
+      showToast({ type: "error", title: "Missing fields", message: "Please enter email and password." });
       return;
     }
 
@@ -56,19 +57,29 @@ export default function LoginScreen() {
 
       const user = await login(email, password);
       const profile = await getUserProfile(user.uid);
+      const normalizedEmail = (user.email || "").trim().toLowerCase();
 
-      if (!profile || !profile.role) {
-        throw new Error("Role not found");
-      }
+      let fallbackRole: string = "sales";
+      if (
+        normalizedEmail === "admin@gmail.com" ||
+        normalizedEmail === "admin2@hotmail.com" ||
+        normalizedEmail === "salahnofal602@gmail.com"
+      )
+        fallbackRole = "admin";
+      else if (normalizedEmail === "warehouse@gmail.com") fallbackRole = "warehouse";
 
-      const role = profile.role;
+      const role = (profile as any)?.role || fallbackRole;
 
-      if (role === "admin") router.replace("/edit");
-      else if (role === "warehouse") router.replace("/products");
-      else router.replace("/cart");
+      if (role === "admin") router.replace("/admin/employees");
+      else if (role === "warehouse") router.replace("/warehouse/orders");
+      else router.replace("/sales/home");
 
     } catch (error: any) {
-      Alert.alert("Login Error", error.message);
+      showToast({
+        type: "error",
+        title: "Login failed",
+        message: error?.message || "Please check your email and password.",
+      });
     } finally {
       setLoading(false);
     }

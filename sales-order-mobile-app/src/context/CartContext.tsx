@@ -1,5 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { getProducts } from '../services/productService';
+import React, { createContext, useContext, useState, type ReactNode } from 'react';
 
 export type CartItem = {
   id: string;
@@ -12,6 +11,7 @@ export type CartItem = {
 
 type CartContextType = {
   cart: CartItem[];
+  addItem: (item: Omit<CartItem, 'quantity'>, quantity?: number) => void;
   increaseQty: (id: string) => void;
   decreaseQty: (id: string) => void;
   removeItem: (id: string) => void;
@@ -24,26 +24,17 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
 
-  useEffect(() => {
-    const loadProducts = async () => {
-      try {
-        const data = await getProducts();
-        const formatted = data.map((item) => ({
-          id: item.id,
-          name: item.name,
-          subtitle: item.description || 'Product',
-          price: Number(item.price) || 0,
-          quantity: 1,
-          image: item.image,
-        }));
-        setCart(formatted);
-      } catch (error) {
-        console.log('Error loading products:', error);
+  const addItem: CartContextType['addItem'] = (item, quantity = 1) => {
+    setCart((prev) => {
+      const existing = prev.find((p) => p.id === item.id);
+      if (existing) {
+        return prev.map((p) =>
+          p.id === item.id ? { ...p, quantity: p.quantity + quantity } : p
+        );
       }
-    };
-
-    loadProducts();
-  }, []);
+      return [...prev, { ...item, quantity }];
+    });
+  };
 
   const increaseQty = (id: string) => {
     setCart((prev) =>
@@ -69,7 +60,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   return (
     <CartContext.Provider
-      value={{ cart, increaseQty, decreaseQty, removeItem, getTotal, clearCart }}
+      value={{ cart, addItem, increaseQty, decreaseQty, removeItem, getTotal, clearCart }}
     >
       {children}
     </CartContext.Provider>

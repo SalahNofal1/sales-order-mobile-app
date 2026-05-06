@@ -1,42 +1,21 @@
-import React, { useEffect, useState } from 'react';
-import {
-  FlatList,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-  Image,
-} from 'react-native';
-
+import React, { useEffect, useMemo, useState } from 'react';
+import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { COLORS } from '../../constants/colors';
-
 import Navbar from '../../components/common/Navbar';
 import Footer from '../../navigation/Footer';
-
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../../services/firebase/config';
+import { getEmployees, type Employee } from '../../services/employeeService';
 
 const ManageEmployeeScreen = () => {
   const router = useRouter();
-  const [data, setData] = useState<any[]>([]);
+  const [data, setData] = useState<Employee[]>([]);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     const fetchEmployees = async () => {
       try {
-        const snapshot = await getDocs(collection(db, 'employees'));
-
-        const list: any[] = [];
-
-        snapshot.forEach((doc) => {
-          list.push({
-            id: doc.id,
-            ...doc.data(),
-          });
-        });
-
+        const list = await getEmployees();
         setData(list);
       } catch (error) {
         console.log(error);
@@ -46,13 +25,19 @@ const ManageEmployeeScreen = () => {
     fetchEmployees();
   }, []);
 
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return data;
+    return data.filter((e) => (e.fullName || e.name || '').toLowerCase().includes(q));
+  }, [data, search]);
+
   return (
     <View style={styles.container}>
 
       <Navbar title="Employees" />
 
       <FlatList
-        data={data}
+        data={filtered}
         keyExtractor={(item: any) => item.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ padding: 15, paddingBottom: 100 }}
@@ -61,26 +46,35 @@ const ManageEmployeeScreen = () => {
           <>
             <View style={styles.searchContainer}>
               <Ionicons name="search-outline" size={18} color={COLORS.textSecondary} />
-              <TextInput placeholder="Search..." style={styles.searchInput} />
+              <TextInput
+                placeholder="Search..."
+                style={styles.searchInput}
+                value={search}
+                onChangeText={setSearch}
+              />
             </View>
 
-            <TouchableOpacity style={styles.addButton}>
+            <TouchableOpacity style={styles.addButton} onPress={() => router.push('/admin/add-employee')}>
               <Text style={styles.addText}>+ Add Employee</Text>
             </TouchableOpacity>
           </>
         }
 
         renderItem={({ item }: any) => (
-          <View style={styles.card}>
+          <TouchableOpacity
+            style={styles.card}
+            activeOpacity={0.85}
+            onPress={() =>
+              router.push({
+                pathname: '/admin/employee/[id]',
+                params: { id: item.id },
+              })
+            }
+          >
 
-            <Image
-              source={{
-                uri: item.image
-                  ? item.image
-                  : `https://i.pravatar.cc/150?u=${item.id}`,
-              }}
-              style={styles.avatar}
-            />
+            <View style={styles.avatarFallback}>
+              <Ionicons name="person-outline" size={20} color={COLORS.textSecondary} />
+            </View>
 
             <View style={styles.info}>
               <Text style={styles.name}>
@@ -88,11 +82,11 @@ const ManageEmployeeScreen = () => {
               </Text>
 
               <Text style={styles.job}>
-                {item.role || item.jobType || 'No job'}
+                {(item as any).role || item.jobType || item.job || 'No job'}
               </Text>
             </View>
 
-            <TouchableOpacity onPress={() => router.push('/edit')}>
+            <TouchableOpacity onPress={() => router.push(`/edit?id=${item.id}`)}>
               <Ionicons
                 name="create-outline"
                 size={22}
@@ -100,7 +94,7 @@ const ManageEmployeeScreen = () => {
               />
             </TouchableOpacity>
 
-          </View>
+          </TouchableOpacity>
         )}
       />
 
@@ -156,10 +150,15 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
   },
 
-  avatar: {
+  avatarFallback: {
     width: 50,
     height: 50,
     borderRadius: 25,
+    backgroundColor: COLORS.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
 
   info: {

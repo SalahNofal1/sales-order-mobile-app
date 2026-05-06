@@ -1,5 +1,5 @@
-import ManageEmployeeScreen from '../src/screens/home/ManageEmployeeScreen';
+import RootRedirect from '../src/screens/RootRedirect';
 
 export default function Home() {
-  return <ManageEmployeeScreen />;
+  return <RootRedirect />;
 }

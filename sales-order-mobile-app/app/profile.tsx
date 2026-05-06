@@ -1,5 +1,10 @@
-import CreateProfileScreen from '../src/screens/profile/CreateProfileScreen';
+import LoginScreen from '../src/screens/auth/LoginScreen';
+import ProfileScreen from '../src/screens/profile/ProfileScreen';
+import { auth } from '../src/services/firebase/config';
 
 export default function Profile() {
-  return <CreateProfileScreen />;
+  if (!auth.currentUser) {
+    return <LoginScreen />;
+  }
+  return <ProfileScreen />;
 }

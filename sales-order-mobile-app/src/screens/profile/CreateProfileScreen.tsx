@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../constants/colors';
 import Navbar from '../../components/common/Navbar';
 import Footer from '../../navigation/Footer';
-import { createEmployeeProfile } from '../../services/employeeService';
+import { adminCreateEmployee } from '../../services/adminEmployeeService';
 
 type JobType = 'Sales Representative' | 'Warehouse Keeper';
 
@@ -67,6 +67,7 @@ export default function CreateProfileScreen() {
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [salesLine, setSalesLine] = useState('');
   const [jobType, setJobType] = useState<JobType>('Sales Representative');
   const [selectedYear, setSelectedYear] = useState('');
@@ -98,7 +99,7 @@ export default function CreateProfileScreen() {
   };
 
   const handleSaveProfile = async () => {
-    if (!fullName.trim() || !phone.trim() || !address.trim() || !email.trim() || !startDate) {
+    if (!fullName.trim() || !phone.trim() || !address.trim() || !email.trim() || !password.trim() || !startDate) {
       showMessage('Missing Fields', 'Please fill all required fields.');
       return;
     }
@@ -106,15 +107,20 @@ export default function CreateProfileScreen() {
       showMessage('Missing Sales Line', 'Please enter the assigned sales line.');
       return;
     }
+    if (password.trim().length < 6) {
+      showMessage('Weak Password', 'Password must be at least 6 characters.');
+      return;
+    }
 
     try {
       setLoading(true);
-      await createEmployeeProfile({
+      await adminCreateEmployee({
         fullName: fullName.trim(),
         phone: phone.trim(),
         address: address.trim(),
         startDate,
         email: email.trim(),
+        password: password.trim(),
         salesLine: jobType === 'Sales Representative' ? salesLine.trim() : '',
         jobType,
       });
@@ -123,6 +129,7 @@ export default function CreateProfileScreen() {
       setPhone('');
       setAddress('');
       setEmail('');
+      setPassword('');
       setSalesLine('');
       setSelectedYear('');
       setSelectedMonth('');
@@ -148,6 +155,14 @@ export default function CreateProfileScreen() {
             <TextInput style={styles.input} value={address} onChangeText={setAddress} />
             <Text style={styles.label}>Email</Text>
             <TextInput style={styles.input} value={email} onChangeText={setEmail} autoCapitalize="none" />
+            <Text style={styles.label}>Password</Text>
+            <TextInput
+              style={styles.input}
+              value={password}
+              onChangeText={setPassword}
+              autoCapitalize="none"
+              secureTextEntry
+            />
             <Text style={styles.label}>Start Date</Text>
             <View style={styles.dateRow}>
               <View style={styles.dateItem}>
@@ -174,7 +189,7 @@ export default function CreateProfileScreen() {
               </>
             )}
             <Pressable style={[styles.saveButton, loading && styles.saveButtonDisabled]} onPress={handleSaveProfile} disabled={loading}>
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveButtonText}>Save Profile</Text>}
+              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveButtonText}>Save Employee</Text>}
             </Pressable>
           </View>
         </ScrollView>

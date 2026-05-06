@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  Alert,
   Animated,
   KeyboardAvoidingView,
   StyleSheet,
@@ -13,7 +12,8 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 
-import { COLORS } from "../../../constants/colors";
+import { COLORS } from "../../constants/colors";
+import { useToast } from "../../context/ToastContext";
 import { signup } from "../../services/authService";
 import { createUserProfile } from "../../services/userService";
 
@@ -27,6 +27,7 @@ export default function SignupScreen() {
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
 
   const router = useRouter();
+  const { showToast } = useToast();
 
   const floatAnim = useRef(new Animated.Value(0)).current;
 
@@ -45,24 +46,34 @@ export default function SignupScreen() {
         }),
       ])
     ).start();
-  }, []);
+  }, [floatAnim]);
+
+  const showMessage = (title: string, message: string, type: "success" | "error" | "info" = "info") => {
+    showToast({ type, title, message });
+  };
 
   const handleSignup = async () => {
     if (!fullName || !email || !password) {
-      Alert.alert("Error", "Please fill all required fields");
+      showMessage("Missing fields", "Please fill all required fields.", "error");
       return;
     }
 
     try {
       const user = await signup(email, password);
 
+      const normalizedEmail = email.trim().toLowerCase();
       let role = "sales";
-      if (email === "admin@gmail.com") role = "admin";
-      else if (email === "warehouse@gmail.com") role = "warehouse";
+      if (
+        normalizedEmail === "admin@gmail.com" ||
+        normalizedEmail === "admin2@hotmail.com" ||
+        normalizedEmail === "salahnofal602@gmail.com"
+      )
+        role = "admin";
+      else if (normalizedEmail === "warehouse@gmail.com") role = "warehouse";
 
       await createUserProfile(user.uid, {
         fullName,
-        email,
+        email: email.trim().toLowerCase(),
         phone,
         address,
         jobType,
@@ -71,7 +82,7 @@ export default function SignupScreen() {
         startDate: new Date().toISOString().split("T")[0],
       });
 
-      Alert.alert("Success", "Account created successfully!");
+      showMessage("Success", "Account created successfully!", "success");
 
       setFullName("");
       setEmail("");
@@ -79,8 +90,9 @@ export default function SignupScreen() {
       setAddress("");
       setJobType("");
       setPassword("");
+      router.replace("/login");
     } catch (error: any) {
-      Alert.alert("Error", error.message);
+      showMessage("Error", error?.message || "Sign up failed", "error");
     }
   };
 
