@@ -1,13 +1,15 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../constants/colors';
 import { useUi } from '../../context/UiContext';
 
 const Navbar = ({ title }: { title?: string }) => {
   const { toggleSidebar } = useUi();
+  const insets = useSafeAreaInsets();
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
 
       <View style={styles.leftSlot}>
         <TouchableOpacity onPress={toggleSidebar} hitSlop={10}>
@@ -27,12 +29,13 @@ export default Navbar;
 
 const styles = StyleSheet.create({
   container: {
-    height: 70,
     backgroundColor: COLORS.surface,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 15,
+    paddingBottom: 12,
+    minHeight: 56,
     borderBottomWidth: 1,
     borderColor: COLORS.border,
     position: 'relative',

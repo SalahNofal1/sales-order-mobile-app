@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { Animated, Platform, StyleSheet, Text, View } from 'react-native';
+import { Animated, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useToast } from '../../context/ToastContext';
 import { COLORS } from '../../constants/colors';
@@ -18,6 +19,7 @@ function getToastTheme(type: 'success' | 'error' | 'info') {
 
 export default function ToastHost() {
   const { toast, hideToast } = useToast();
+  const insets = useSafeAreaInsets();
 
   const visible = !!toast;
   const anim = useRef(new Animated.Value(0)).current;
@@ -55,7 +57,7 @@ export default function ToastHost() {
   const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
 
   return (
-    <View pointerEvents="none" style={styles.wrap}>
+    <View pointerEvents="none" style={[styles.wrap, { top: insets.top + 10 }]}>
       <Animated.View
         style={[
           styles.toast,
@@ -79,7 +81,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 12,
     right: 12,
-    top: Platform.select({ ios: 58, default: 18 }),
     zIndex: 9999,
     elevation: 50,
   },

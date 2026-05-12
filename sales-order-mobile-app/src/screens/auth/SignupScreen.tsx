@@ -11,6 +11,7 @@ import {
 
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { COLORS } from "../../constants/colors";
 import { useToast } from "../../context/ToastContext";
@@ -97,6 +98,7 @@ export default function SignupScreen() {
   };
 
   return (
+    <SafeAreaView style={styles.safeRoot} edges={["top"]}>
     <KeyboardAvoidingView style={styles.container}>
 
       {}
@@ -166,10 +168,15 @@ export default function SignupScreen() {
 
       </View>
     </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeRoot: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
   container: {
     flex: 1,
     backgroundColor: COLORS.background,

@@ -1,21 +1,22 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import ConfirmOrderBar from '../../components/cart/ConfirmOrderBar';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { COLORS } from '../../constants/colors';
 import { useToast } from '../../context/ToastContext';
 import { createOrder } from '../../services/orderService';
+import { getErrorMessage } from '../../utils/errorMessage';
 import Navbar from '../../components/common/Navbar';
 import Footer from '../../navigation/Footer';
 import CartProductItem from '../../components/cart/CartProductItem';
@@ -24,8 +25,8 @@ import { useRouter } from 'expo-router';
 export default function CartScreen() {
   const { user } = useAuth();
   const router = useRouter();
-  const { cart, getTotal, clearCart } = useCart();
-  const total = getTotal();
+  const { cart, cartTotal, clearCart } = useCart();
+  const total = cartTotal;
   const { showToast } = useToast();
 
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -43,11 +44,14 @@ export default function CartScreen() {
     [cart]
   );
 
-  const showMessage = (title: string, message: string, type: 'success' | 'error' | 'info' = 'info') => {
-    showToast({ type, title, message });
-  };
+  const showMessage = useCallback(
+    (title: string, message: string, type: 'success' | 'error' | 'info' = 'info') => {
+      showToast({ type, title, message });
+    },
+    [showToast]
+  );
 
-  const openConfirm = () => {
+  const openConfirm = useCallback(() => {
     if (!user) {
       showMessage('Authentication Required', 'Please sign up or login first.', 'error');
       return;
@@ -57,9 +61,9 @@ export default function CartScreen() {
       return;
     }
     setConfirmOpen(true);
-  };
+  }, [user, cart.length, showMessage]);
 
-  const handleConfirmOrder = async () => {
+  const handleConfirmOrder = useCallback(async () => {
     if (!user) return;
     if (!customerName.trim()) {
       showMessage('Missing customer name', 'Please enter the customer name.', 'error');
@@ -80,24 +84,28 @@ export default function CartScreen() {
       setCustomerName('');
       setDeliveryTime('');
       showMessage('Success', 'Order confirmed and saved successfully.', 'success');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.log('Error saving order:', error);
-      showMessage('Error', error?.message || 'Failed to save order.', 'error');
+      showMessage('Error', getErrorMessage(error, 'Failed to save order.'), 'error');
     } finally {
       setSaving(false);
     }
-  };
+  }, [user, customerName, deliveryTime, total, cartItems, clearCart, showMessage]);
+
+  const goCreateOrder = useCallback(() => {
+    router.push('/sales/home');
+  }, [router]);
 
   return (
     <>
       <Navbar title="Cart" />
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         <View style={styles.container}>
           <ScrollView contentContainerStyle={styles.scrollContent}>
             {cart.length === 0 ? (
               <View style={styles.emptyWrap}>
                 <Text style={styles.emptyText}>Your order is empty</Text>
-                <Pressable style={styles.createBtn} onPress={() => router.push('/sales/home')}>
+                <Pressable style={styles.createBtn} onPress={goCreateOrder}>
                   <Text style={styles.createBtnText}>Create New Order</Text>
                 </Pressable>
               </View>

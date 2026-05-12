@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import { Redirect } from 'expo-router';
+import { Redirect, type Href } from 'expo-router';
 import { COLORS } from '../constants/colors';
 import { auth } from '../services/firebase/config';
 import { getUserProfile } from '../services/userService';
@@ -8,15 +8,15 @@ import { getUserProfile } from '../services/userService';
 export default function RootRedirect() {
   const [loading, setLoading] = useState(true);
   const [target, setTarget] = useState<
-    '/login' | '/admin/employees' | '/products' | '/sales/home'
-  >('/login');
+    '/about-us' | '/login' | '/admin/employees' | '/products' | '/sales/home'
+  >('/about-us');
 
   useEffect(() => {
     const run = async () => {
       try {
         const user = auth.currentUser;
         if (!user) {
-          setTarget('/login');
+          setTarget('/about-us');
           return;
         }
 
@@ -27,7 +27,7 @@ export default function RootRedirect() {
         else if (role === 'warehouse') setTarget('/products');
         else setTarget('/sales/home');
       } catch {
-        setTarget('/login');
+        setTarget('/about-us');
       } finally {
         setLoading(false);
       }
@@ -37,7 +37,7 @@ export default function RootRedirect() {
   }, []);
 
   if (!loading) {
-    return <Redirect href={target} />;
+    return <Redirect href={target as Href} />;
   }
 
   return (

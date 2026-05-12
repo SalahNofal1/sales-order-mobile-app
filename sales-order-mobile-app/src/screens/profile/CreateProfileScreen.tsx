@@ -5,13 +5,13 @@ import {
   Modal,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../constants/colors';
 import Navbar from '../../components/common/Navbar';
@@ -144,7 +144,7 @@ export default function CreateProfileScreen() {
   return (
     <>
       <Navbar title="Add Employee" />
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <View style={styles.formCard}>
             <Text style={styles.label}>Full Name</Text>

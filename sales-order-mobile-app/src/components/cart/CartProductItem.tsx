@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { CartItem } from '../../context/CartContext';
 import { useCart } from '../../context/CartContext';
@@ -10,9 +10,25 @@ type Props = {
 
 const placeholderImage = { uri: 'https://via.placeholder.com/90x78' };
 
-export default function CartProductItem({ product }: Props) {
+function CartProductItemComponent({ product }: Props) {
   const { increaseQty, decreaseQty, removeItem } = useCart();
-  const imageSource = product.image ? { uri: product.image } : placeholderImage;
+
+  const imageSource = useMemo(
+    () => (product.image ? { uri: product.image } : placeholderImage),
+    [product.image]
+  );
+
+  const onRemove = useCallback(() => {
+    removeItem(product.id);
+  }, [removeItem, product.id]);
+
+  const onIncrease = useCallback(() => {
+    increaseQty(product.id);
+  }, [increaseQty, product.id]);
+
+  const onDecrease = useCallback(() => {
+    decreaseQty(product.id);
+  }, [decreaseQty, product.id]);
 
   return (
     <View style={styles.wrapper}>
@@ -26,18 +42,18 @@ export default function CartProductItem({ product }: Props) {
               <Text style={styles.price}>${product.price.toFixed(2)}</Text>
             </View>
 
-            <Pressable onPress={() => removeItem(product.id)} style={styles.closeButton}>
+            <Pressable onPress={onRemove} style={styles.closeButton}>
               <Text style={styles.close}>x</Text>
             </Pressable>
           </View>
 
           <View style={styles.bottom}>
             <View style={styles.qtyContainer}>
-              <Pressable style={styles.qtyBtn} onPress={() => increaseQty(product.id)}>
+              <Pressable style={styles.qtyBtn} onPress={onIncrease}>
                 <Text style={styles.qtySymbol}>+</Text>
               </Pressable>
               <Text style={styles.qtyNumber}>{product.quantity}</Text>
-              <Pressable style={styles.qtyBtn} onPress={() => decreaseQty(product.id)}>
+              <Pressable style={styles.qtyBtn} onPress={onDecrease}>
                 <Text style={styles.qtySymbol}>-</Text>
               </Pressable>
             </View>
@@ -47,6 +63,8 @@ export default function CartProductItem({ product }: Props) {
     </View>
   );
 }
+
+export default React.memo(CartProductItemComponent);
 
 const styles = StyleSheet.create({
   wrapper: {

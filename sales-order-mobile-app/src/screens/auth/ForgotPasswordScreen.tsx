@@ -16,18 +16,16 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { COLORS } from "../../constants/colors";
 import { useToast } from "../../context/ToastContext";
-import { login } from "../../services/authService";
-import { getUserProfile } from "../../services/userService";
+import { sendResetPassword } from "../../services/authService";
+import { getErrorMessage } from "../../utils/errorMessage";
 
-export default function LoginScreen() {
+export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const router = useRouter();
   const { showToast } = useToast();
-
   const floatAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -47,40 +45,36 @@ export default function LoginScreen() {
     ).start();
   }, [floatAnim]);
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      showToast({ type: "error", title: "Missing fields", message: "Please enter email and password." });
+  const handleReset = async () => {
+    if (!email.trim()) {
+      showToast({ type: "error", title: "Missing email", message: "Please enter your email." });
       return;
     }
 
     try {
       setLoading(true);
-
-      const user = await login(email, password);
-      const profile = await getUserProfile(user.uid);
-      const normalizedEmail = (user.email || "").trim().toLowerCase();
-
-      let fallbackRole: string = "sales";
-      if (
-        normalizedEmail === "admin@gmail.com" ||
-        normalizedEmail === "admin2@hotmail.com" ||
-        normalizedEmail === "salahnofal602@gmail.com"
-      )
-        fallbackRole = "admin";
-      else if (normalizedEmail === "warehouse@gmail.com") fallbackRole = "warehouse";
-
-      const role = (profile as any)?.role || fallbackRole;
-
-      if (role === "admin") router.replace("/admin/employees");
-      else if (role === "warehouse") router.replace("/warehouse/orders");
-      else router.replace("/sales/home");
-
-    } catch (error: any) {
+      await sendResetPassword(email.trim());
       showToast({
-        type: "error",
-        title: "Login failed",
-        message: error?.message || "Please check your email and password.",
+        type: "success",
+        title: "Email sent",
+        message: "Check your inbox for a link to reset your password.",
       });
+      router.replace("/login");
+    } catch (error: unknown) {
+      const code = typeof error === "object" && error !== null && "code" in error ? String((error as { code?: string }).code) : "";
+      if (code === "auth/user-not-found") {
+        showToast({
+          type: "error",
+          title: "Account not found",
+          message: "No account found with this email.",
+        });
+      } else {
+        showToast({
+          type: "error",
+          title: "Reset failed",
+          message: getErrorMessage(error, "Something went wrong. Please try again."),
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -92,34 +86,15 @@ export default function LoginScreen() {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-
-      {}
       <Animated.View style={[styles.bubble, styles.b1, { transform: [{ translateY: floatAnim }] }]} />
       <Animated.View style={[styles.bubble, styles.b2, { transform: [{ translateY: floatAnim }] }]} />
       <Animated.View style={[styles.bubble, styles.b3, { transform: [{ translateY: floatAnim }] }]} />
       <Animated.View style={[styles.bubble, styles.b4, { transform: [{ translateY: floatAnim }] }]} />
-      <Animated.View style={[styles.bubble, styles.b5, { transform: [{ translateY: floatAnim }] }]} />
 
-      {}
-      <Animated.View
-        style={[
-          styles.shapeBottom,
-          {
-            transform: [
-              {
-                translateY: floatAnim.interpolate({
-                  inputRange: [0, 10],
-                  outputRange: [0, -10],
-                }),
-              },
-            ],
-          },
-        ]}
-      />
-
-      {/* 🔥 CARD */}
       <View style={styles.card}>
-        <Text style={styles.title}>Login</Text>
+        <Text style={styles.title}>Forgot Password?</Text>
+
+        <Text style={styles.subtitle}>Enter your email and we will send you a reset link.</Text>
 
         <TextInput
           placeholder="Email"
@@ -130,35 +105,20 @@ export default function LoginScreen() {
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
+          keyboardType="email-address"
+          editable={!loading}
         />
 
-        <TextInput
-          placeholder="Password"
-          placeholderTextColor={COLORS.textSecondary}
-          secureTextEntry
-          style={[styles.input, focusedInput === "password" && styles.inputFocused]}
-          onFocus={() => setFocusedInput("password")}
-          onBlur={() => setFocusedInput(null)}
-          value={password}
-          onChangeText={setPassword}
-        />
-
-        <TouchableOpacity onPress={() => router.push("/forgot-password")} disabled={loading}>
-          <Text style={styles.forgotText}>Forgot password?</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
+        <TouchableOpacity style={styles.button} onPress={handleReset} disabled={loading}>
           {loading ? (
             <ActivityIndicator color={COLORS.background} />
           ) : (
-            <Text style={styles.buttonText}>LOGIN</Text>
+            <Text style={styles.buttonText}>SEND RESET LINK</Text>
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.push("/signup")}>
-          <Text style={styles.loginText}>
-            Don’t have an account? <Text style={styles.link}>Sign Up</Text>
-          </Text>
+        <TouchableOpacity onPress={() => router.push("/login")} disabled={loading}>
+          <Text style={styles.backText}>Back to Login</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -179,7 +139,6 @@ const styles = StyleSheet.create({
     padding: 20,
   },
 
-
   bubble: {
     position: "absolute",
     borderRadius: 100,
@@ -191,20 +150,6 @@ const styles = StyleSheet.create({
   b2: { width: 80, height: 80, bottom: 100, right: 50 },
   b3: { width: 60, height: 60, top: 200, right: 90 },
   b4: { width: 100, height: 100, bottom: 200, left: 60 },
-  b5: { width: 50, height: 50, top: 140, left: 120 },
-
-  
-
-  shapeBottom: {
-    position: "absolute",
-    bottom: -150,
-    left: -100,
-    width: 350,
-    height: 350,
-    borderRadius: 200,
-    opacity: 0.2,
-    backgroundColor: COLORS.secondary,
-  },
 
   card: {
     width: "100%",
@@ -219,11 +164,17 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: "700",
     color: COLORS.primary,
     textAlign: "center",
-    marginBottom: 30,
+    marginBottom: 10,
+  },
+
+  subtitle: {
+    textAlign: "center",
+    color: COLORS.textSecondary,
+    marginBottom: 25,
   },
 
   input: {
@@ -232,23 +183,15 @@ const styles = StyleSheet.create({
     marginBottom: 18,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.divider,
+    color: COLORS.textPrimary,
   },
 
   inputFocused: {
     borderBottomColor: COLORS.primary,
   },
 
-  forgotText: {
-    alignSelf: "flex-end",
-    marginTop: -8,
-    marginBottom: 8,
-    color: COLORS.secondary,
-    fontWeight: "700",
-    fontSize: 14,
-  },
-
   button: {
-    marginTop: 25,
+    marginTop: 10,
     backgroundColor: COLORS.secondary,
     padding: 16,
     borderRadius: 25,
@@ -258,16 +201,13 @@ const styles = StyleSheet.create({
   buttonText: {
     color: COLORS.background,
     fontWeight: "bold",
+    letterSpacing: 1,
   },
 
-  loginText: {
+  backText: {
     marginTop: 15,
     textAlign: "center",
-    color: COLORS.textSecondary,
-  },
-
-  link: {
     color: COLORS.primary,
-    fontWeight: "700",
+    fontWeight: "600",
   },
 });

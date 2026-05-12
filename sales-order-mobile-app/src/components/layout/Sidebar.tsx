@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../constants/colors';
 import { useUi } from '../../context/UiContext';
 import { useAuth } from '../../context/AuthContext';
@@ -10,6 +11,7 @@ import { getUserProfile } from '../../services/userService';
 
 export default function Sidebar() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { sidebarOpen, closeSidebar } = useUi();
   const { user } = useAuth();
   const [role, setRole] = useState<string | null>(null);
@@ -63,7 +65,7 @@ export default function Sidebar() {
   return (
     <View style={styles.overlay}>
       <Pressable style={styles.backdrop} onPress={closeSidebar} />
-      <View style={styles.panel}>
+      <View style={[styles.panel, { paddingTop: insets.top + 14 }]}>
         <View style={styles.header}>
           <Text style={styles.title}>Menu</Text>
           <Pressable onPress={closeSidebar}>
@@ -161,7 +163,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
     borderRightWidth: 1,
     borderColor: COLORS.border,
-    padding: 14,
+    paddingHorizontal: 14,
+    paddingBottom: 14,
   },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   title: { fontSize: 16, fontWeight: '900', color: COLORS.textPrimary },

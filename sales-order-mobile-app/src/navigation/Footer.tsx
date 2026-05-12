@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { usePathname, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/colors';
 import { useAuth } from '../context/AuthContext';
 import { getUserProfile } from '../services/userService';
@@ -9,6 +10,7 @@ import { getUserProfile } from '../services/userService';
 const Footer = () => {
   const router = useRouter();
   const pathname = usePathname();
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [role, setRole] = useState<string | null>(null);
 
@@ -85,7 +87,7 @@ const Footer = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       {(isAdmin || normalizedRole === 'sales') && <Tab route="/sales/home" icon="home-outline" label="Home" />}
 
       {isWarehouse && <Tab route="/sales/home" icon="home-outline" label="Home" />}
