@@ -13,6 +13,7 @@ import {
 
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 
 import { COLORS } from "../../constants/colors";
 import { useToast } from "../../context/ToastContext";
@@ -23,6 +24,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const router = useRouter();
@@ -132,16 +134,37 @@ export default function LoginScreen() {
           autoCapitalize="none"
         />
 
-        <TextInput
-          placeholder="Password"
-          placeholderTextColor={COLORS.textSecondary}
-          secureTextEntry
-          style={[styles.input, focusedInput === "password" && styles.inputFocused]}
-          onFocus={() => setFocusedInput("password")}
-          onBlur={() => setFocusedInput(null)}
-          value={password}
-          onChangeText={setPassword}
-        />
+        <View
+          style={[
+            styles.passwordField,
+            focusedInput === "password" && styles.inputFocused,
+          ]}
+        >
+          <TextInput
+            placeholder="Password"
+            placeholderTextColor={COLORS.textSecondary}
+            secureTextEntry={!showPassword}
+            style={styles.passwordInput}
+            onFocus={() => setFocusedInput("password")}
+            onBlur={() => setFocusedInput(null)}
+            value={password}
+            onChangeText={setPassword}
+          />
+
+          <TouchableOpacity
+            onPress={() => setShowPassword((current) => !current)}
+            disabled={loading}
+            accessibilityRole="button"
+            accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+            style={styles.passwordToggle}
+          >
+            <Ionicons
+              name={showPassword ? "eye-off-outline" : "eye-outline"}
+              size={22}
+              color={COLORS.textSecondary}
+            />
+          </TouchableOpacity>
+        </View>
 
         <TouchableOpacity onPress={() => router.push("/forgot-password")} disabled={loading}>
           <Text style={styles.forgotText}>Forgot password?</Text>
@@ -236,6 +259,26 @@ const styles = StyleSheet.create({
 
   inputFocused: {
     borderBottomColor: COLORS.primary,
+  },
+
+  passwordField: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.divider,
+  },
+
+  passwordInput: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingRight: 8,
+  },
+
+  passwordToggle: {
+    paddingVertical: 8,
+    paddingLeft: 4,
   },
 
   forgotText: {

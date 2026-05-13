@@ -44,3 +44,7 @@ export const createUserAsAdmin = async (email: string, password: string) => {
 export const sendResetPassword = async (email: string) => {
   await sendPasswordResetEmail(auth, email);
 };
+
+export const logout = async () => {
+  await signOut(auth);
+};

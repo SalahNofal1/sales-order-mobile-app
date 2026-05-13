@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../constants/colors';
 import { useUi } from '../../context/UiContext';
 import { useAuth } from '../../context/AuthContext';
-import { auth } from '../../services/firebase/config';
+import { logout } from '../../services/authService';
 import { getUserProfile } from '../../services/userService';
 
 export default function Sidebar() {
@@ -133,7 +133,7 @@ export default function Sidebar() {
           <Pressable
             style={styles.item}
             onPress={async () => {
-              await auth.signOut();
+              await logout();
               closeSidebar();
               router.replace('/login');
             }}
