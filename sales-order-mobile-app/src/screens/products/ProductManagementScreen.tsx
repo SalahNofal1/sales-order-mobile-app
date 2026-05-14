@@ -1,17 +1,17 @@
-import * as ImagePicker from 'expo-image-picker';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    Alert,
-    FlatList,
-    Image,
-    Modal,
-    Platform,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
@@ -19,69 +19,53 @@ import { COLORS } from '../../constants/colors';
 
 import Navbar from '../../components/common/Navbar';
 import Footer from '../../navigation/Footer';
-import {
-  createProduct,
-  deleteProduct,
-  getProducts,
-  type Product,
-  updateProduct,
-} from '../../services/productService';
+import { useToast } from '../../context/ToastContext';
+import { useImagePicker } from '../../hooks/useImagePicker';
+import { useProducts } from '../../hooks/useProducts';
+import { createProduct, deleteProduct, type Product, updateProduct } from '../../services/productService';
+import { getErrorMessage } from '../../utils/errorMessage';
 
 const ProductManagementScreen = () => {
-  const [data, setData] = useState<Product[]>([]);
+  const { products: data, loading: productsLoading, error: productsError, reload: loadProducts } = useProducts();
+  const [search, setSearch] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [description, setDescription] = useState('');
-  const [imageUri, setImageUri] = useState<string | undefined>();
   const [saving, setSaving] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const nameInputRef = useRef<TextInput>(null);
 
-  const showMessage = (title: string, message: string) => {
-    if (Platform.OS === 'web') {
-      window.alert(`${title}\n\n${message}`);
-      return;
-    }
-    Alert.alert(title, message);
-  };
+  const { showToast } = useToast();
 
-  const loadProducts = useCallback(async () => {
-    try {
-      const list = await getProducts();
-      setData(list);
-    } catch (error: any) {
-      showMessage('Error', error?.message || 'Failed to load products.');
-    }
-  }, []);
+  const showMessage = useCallback(
+    (title: string, message: string, type: 'success' | 'error' | 'info' = 'info') => {
+      if (Platform.OS === 'web' && type === 'error') {
+        window.alert(`${title}\n\n${message}`);
+        return;
+      }
+      showToast({ type, title, message });
+    },
+    [showToast]
+  );
+
+  const { imageUri, setImageUri, requestAddProductImage } = useImagePicker(showMessage);
 
   useEffect(() => {
-    loadProducts();
-  }, [loadProducts]);
-
-  const handlePickImage = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      showMessage('Permission Required', 'Please allow gallery access to select images.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.7,
-    });
-    if (!result.canceled) {
-      setImageUri(result.assets[0].uri);
-    }
-  };
+    if (!modalVisible) return;
+    const t = setTimeout(() => nameInputRef.current?.focus(), 250);
+    return () => clearTimeout(t);
+  }, [modalVisible]);
 
   const handleCreateProduct = async () => {
     if (!name.trim() || !price.trim()) {
-      showMessage('Missing Fields', 'Please enter product name and price.');
+      showMessage('Missing Fields', 'Please enter product name and price.', 'error');
       return;
     }
 
     const numericPrice = Number(price);
     if (Number.isNaN(numericPrice)) {
-      showMessage('Invalid Price', 'Price must be a valid number.');
+      showMessage('Invalid Price', 'Price must be a valid number.', 'error');
       return;
     }
 
@@ -109,10 +93,14 @@ const ProductManagementScreen = () => {
       setEditingProductId(null);
       setModalVisible(false);
       await loadProducts();
-      showMessage('Success', editingProductId ? 'Product updated successfully.' : 'Product added successfully.');
-    } catch (error: any) {
+      showMessage(
+        'Success',
+        editingProductId ? 'Product updated successfully.' : 'Product added successfully.',
+        'success'
+      );
+    } catch (error: unknown) {
       console.log('Create product error:', error);
-      showMessage('Error', error?.message || 'Failed to save product or upload image.');
+      showMessage('Error', getErrorMessage(error, 'Failed to save product or upload image.'), 'error');
     } finally {
       setSaving(false);
     }
@@ -128,20 +116,55 @@ const ProductManagementScreen = () => {
   };
 
   const handleDeleteProduct = async (id: string) => {
-    try {
-      await deleteProduct(id);
-      await loadProducts();
-      showMessage('Success', 'Product deleted successfully.');
-    } catch (error: any) {
-      showMessage('Error', error?.message || 'Failed to delete product.');
+    const confirmDelete = async () => {
+      try {
+        await deleteProduct(id);
+        await loadProducts();
+        showMessage('Success', 'Product deleted successfully.', 'success');
+      } catch (error: unknown) {
+        showMessage('Error', getErrorMessage(error, 'Failed to delete product.'), 'error');
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      const ok = window.confirm('Are you sure you want to delete this product?');
+      if (ok) await confirmDelete();
+      return;
     }
+
+    Alert.alert('Delete', 'Are you sure?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Yes', style: 'destructive', onPress: () => confirmDelete() },
+    ]);
   };
+
+  const filteredData = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return data.filter((item) => (item.name || '').toLowerCase().includes(q));
+  }, [data, search]);
 
   return (
     <>
       <Navbar title="Products" />
 
       <View style={styles.container}>
+
+        {productsError ? (
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorText}>{productsError}</Text>
+          </View>
+        ) : null}
+
+        <View style={styles.searchRow}>
+          <Ionicons name="search-outline" size={18} color={COLORS.textSecondary} />
+          <TextInput
+            placeholder="Search product..."
+            value={search}
+            onChangeText={setSearch}
+            style={styles.searchInput}
+            placeholderTextColor={COLORS.textSecondary}
+          />
+        </View>
 
         {/* Add Button */}
         <TouchableOpacity
@@ -159,32 +182,47 @@ const ProductManagementScreen = () => {
         </TouchableOpacity>
 
         {/* List */}
-        <FlatList
-          data={data}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View style={styles.card}>
+        {productsLoading && data.length === 0 ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator color={COLORS.secondary} />
+          </View>
+        ) : (
+          <FlatList
+            data={filteredData}
+            keyExtractor={(item) => item.id}
+            ListEmptyComponent={
+              productsLoading ? null : <Text style={styles.emptyList}>No products</Text>
+            }
+            renderItem={({ item }) => (
+              <View style={styles.card}>
+                <Image
+                  source={{
+                    uri:
+                      item.image && item.image.startsWith('http')
+                        ? item.image
+                        : 'https://cdn-icons-png.flaticon.com/512/149/149071.png',
+                  }}
+                  style={styles.image}
+                />
 
-              <Image source={{ uri: item.image || 'https://via.placeholder.com/80' }} style={styles.image} />
+                <View style={styles.info}>
+                  <Text style={styles.name}>{item.name}</Text>
+                  <Text style={styles.price}>${Number(item.price).toFixed(2)}</Text>
+                  <Text style={styles.desc}>{item.description || 'Product'}</Text>
+                </View>
 
-              <View style={styles.info}>
-                <Text style={styles.name}>{item.name}</Text>
-                <Text style={styles.price}>${Number(item.price).toFixed(2)}</Text>
-                <Text style={styles.desc}>{item.description || 'Product'}</Text>
+                <View style={styles.actions}>
+                  <TouchableOpacity onPress={() => openEditModal(item)}>
+                    <Ionicons name="create-outline" size={20} color={COLORS.primary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleDeleteProduct(item.id)}>
+                    <Ionicons name="trash-outline" size={20} color={COLORS.error} />
+                  </TouchableOpacity>
+                </View>
               </View>
-
-              <View style={styles.actions}>
-                <TouchableOpacity onPress={() => openEditModal(item)}>
-                  <Ionicons name="create-outline" size={20} color={COLORS.primary} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleDeleteProduct(item.id)}>
-                  <Ionicons name="trash-outline" size={20} color={COLORS.error} />
-                </TouchableOpacity>
-              </View>
-
-            </View>
-          )}
-        />
+            )}
+          />
+        )}
 
       </View>
 
@@ -192,7 +230,13 @@ const ProductManagementScreen = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>{editingProductId ? 'Edit Product' : 'Add Product'}</Text>
-            <TextInput style={styles.input} placeholder="Product name" value={name} onChangeText={setName} />
+            <TextInput
+              ref={nameInputRef}
+              style={styles.input}
+              placeholder="Product name"
+              value={name}
+              onChangeText={setName}
+            />
             <TextInput
               style={styles.input}
               placeholder="Price"
@@ -208,8 +252,8 @@ const ProductManagementScreen = () => {
               multiline
             />
 
-            <Pressable style={styles.pickImageButton} onPress={handlePickImage}>
-              <Text style={styles.pickImageText}>{imageUri ? 'Change image' : 'Pick image from gallery'}</Text>
+            <Pressable style={styles.pickImageButton} onPress={requestAddProductImage}>
+              <Text style={styles.pickImageText}>{imageUri ? 'Change Product Image' : 'Add Product Image'}</Text>
             </Pressable>
             {imageUri ? <Image source={{ uri: imageUri }} style={styles.previewImage} /> : null}
 
@@ -241,6 +285,48 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
     padding: 15,
+  },
+
+  errorBanner: {
+    backgroundColor: '#FEF2F2',
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: COLORS.error,
+  },
+  errorText: {
+    color: COLORS.error,
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  loadingWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  emptyList: {
+    textAlign: 'center',
+    color: COLORS.textSecondary,
+    marginTop: 24,
+  },
+
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  searchInput: {
+    flex: 1,
+    padding: 10,
   },
 
   addButton: {

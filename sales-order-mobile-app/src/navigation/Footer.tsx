@@ -1,63 +1,111 @@
-import React from 'react';
-import { View, TouchableOpacity, StyleSheet, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, usePathname } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/colors';
+import { useAuth } from '../context/AuthContext';
+import { getUserProfile } from '../services/userService';
 
 const Footer = () => {
   const router = useRouter();
   const pathname = usePathname();
+  const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const [role, setRole] = useState<string | null>(null);
 
-  const tabs = [
-    { name: 'Employees', icon: 'people-outline', route: '/' },
-    { name: 'Products', icon: 'cube-outline', route: '/products' },
-    { name: 'Orders', icon: 'cart-outline', route: '/cart' },
-    { name: 'Profile', icon: 'person-outline', route: '/profile' },
-  ];
+  useEffect(() => {
+    const fetchRole = async () => {
+      if (!user) {
+        setRole(null);
+        return;
+      }
+
+      try {
+        const employee = await getUserProfile(user.uid);
+        const email = (user.email || '').trim().toLowerCase();
+
+        let fallbackRole: string | null = null;
+        if (email === 'admin@gmail.com' || email === 'admin2@hotmail.com') fallbackRole = 'admin';
+        else if (email === 'warehouse@gmail.com') fallbackRole = 'warehouse';
+        else fallbackRole = 'sales';
+
+        setRole(String((employee as any)?.role || fallbackRole).toLowerCase());
+      } catch (error) {
+        console.log('Error fetching role:', error);
+        const email = (user.email || '').trim().toLowerCase();
+        if (email === 'admin@gmail.com' || email === 'admin2@hotmail.com') setRole('admin');
+        else if (email === 'warehouse@gmail.com') setRole('warehouse');
+        else setRole('sales');
+      }
+    };
+
+    fetchRole();
+  }, [pathname, user?.uid]);
+
+  const isLoggedIn = !!user;
+  const normalizedRole = (role || '').toLowerCase();
+  const isAdmin = normalizedRole === 'admin';
+  const isWarehouse = normalizedRole === 'warehouse';
+  const isActive = (route: string) =>
+    pathname === route || (route !== '/' && pathname.startsWith(route));
+
+  const Tab = ({
+    route,
+    icon,
+    label,
+  }: {
+    route:
+      | '/'
+      | '/sales/home'
+      | '/warehouse/orders'
+      | '/admin/employees'
+      | '/products'
+      | '/cart'
+      | '/orders'
+      | '/login';
+    icon: keyof typeof Ionicons.glyphMap;
+    label: string;
+  }) => {
+    const active = isActive(route);
+    return (
+      <TouchableOpacity
+        style={[styles.tab, active && styles.tabActive]}
+        onPress={() => router.push(route)}
+        activeOpacity={0.8}
+      >
+        <Ionicons
+          name={icon}
+          size={22}
+          color={active ? COLORS.surface : COLORS.primary}
+        />
+        <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>
+          {label}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
+      {(isAdmin || normalizedRole === 'sales') && <Tab route="/sales/home" icon="home-outline" label="Home" />}
 
-      {tabs.map((tab, index) => {
-        const isActive = pathname === tab.route;
+      {isWarehouse && <Tab route="/sales/home" icon="home-outline" label="Home" />}
 
-        return (
-          <TouchableOpacity
-            key={index}
-            style={styles.tab}
-            onPress={() => router.push(tab.route as any)} // ✅ حل المشكلة
-          >
+      {isAdmin && (
+        <Tab route="/admin/employees" icon="people-outline" label="Emp" />
+      )}
 
-            {/* Active Line */}
-            {isActive && <View style={styles.activeLine} />}
+      {(isAdmin || isWarehouse) && <Tab route="/products" icon="cube-outline" label="Products" />}
 
-            {/* Icon */}
-            <Ionicons
-              name={tab.icon as any}
-              size={24}
-              color={isActive ? COLORS.primary : COLORS.textSecondary}
-            />
+      {(isAdmin || normalizedRole === 'sales') && (
+        <Tab route="/cart" icon="cart-outline" label="Cart" />
+      )}
 
-            {/* Text */}
-            <Text
-              style={[
-                styles.label,
-                { color: isActive ? COLORS.primary : COLORS.textSecondary },
-              ]}
-            >
-              {tab.name}
-            </Text>
+      {isLoggedIn && !isWarehouse && <Tab route="/orders" icon="receipt-outline" label="Orders" />}
+      {isWarehouse && <Tab route="/warehouse/orders" icon="receipt-outline" label="Orders" />}
 
-            {/* Badge */}
-            {tab.name === 'Orders' && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>3</Text>
-              </View>
-            )}
-
-          </TouchableOpacity>
-        );
-      })}
+      {!isLoggedIn ? <Tab route="/login" icon="log-in-outline" label="Login" /> : null}
 
     </View>
   );
@@ -69,49 +117,30 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    alignItems: 'center',
-
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 12,
-
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    backgroundColor: COLORS.surface,
     borderTopWidth: 1,
     borderColor: COLORS.border,
-
-    elevation: 10,
   },
-
   tab: {
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    minWidth: 70,
   },
-
-  label: {
-    fontSize: 11,
-    marginTop: 3,
-  },
-
-  activeLine: {
-    position: 'absolute',
-    top: -10,
-    width: 25,
-    height: 3,
-    borderRadius: 2,
+  tabActive: {
     backgroundColor: COLORS.primary,
   },
-
-  badge: {
-    position: 'absolute',
-    top: -5,
-    right: -10,
-    backgroundColor: COLORS.error,
-    borderRadius: 10,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
+  tabLabel: {
+    marginTop: 4,
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.primary,
   },
-
-  badgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
+  tabLabelActive: {
+    color: COLORS.surface,
   },
 });

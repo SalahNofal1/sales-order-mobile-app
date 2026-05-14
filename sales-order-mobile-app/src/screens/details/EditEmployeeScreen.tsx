@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
+import { updatePassword } from 'firebase/auth';
 import { COLORS } from '../../constants/colors';
 
 import Navbar from '../../components/common/Navbar';
@@ -20,17 +21,24 @@ import {
   getEmployeeById,
   updateEmployee,
 } from '../../services/employeeService';
+import { useAuth } from '../../context/AuthContext';
+import { auth } from '../../services/firebase/config';
+import { getUserProfile } from '../../services/userService';
+import { adminSetPasswordByEmail } from '../../services/functions/adminPasswordService';
 
 const EditEmployeeScreen = () => {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
+  const { user } = useAuth();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [job, setJob] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const showMessage = (title: string, message: string) => {
     if (Platform.OS === 'web') {
@@ -58,6 +66,56 @@ const EditEmployeeScreen = () => {
     loadEmployee();
   }, [id]);
 
+  useEffect(() => {
+    const run = async () => {
+      if (!user) {
+        setIsAdmin(false);
+        return;
+      }
+
+      const normalizedEmail = (user.email || '').trim().toLowerCase();
+      if (
+        normalizedEmail === 'admin@gmail.com' ||
+        normalizedEmail === 'admin2@hotmail.com' ||
+        normalizedEmail === 'salahnofal602@gmail.com'
+      ) {
+        setIsAdmin(true);
+        return;
+      }
+
+      try {
+        const profile = await getUserProfile(user.uid);
+        setIsAdmin(String((profile as any)?.role || '').toLowerCase() === 'admin');
+      } catch {
+        setIsAdmin(false);
+      }
+    };
+
+    run();
+  }, [user?.uid]);
+
+  const canChangeOwnPassword = !!user && !!id && user.uid === id;
+
+  const handleAdminSetPassword = async () => {
+    const targetEmail = email.trim();
+    if (!targetEmail) {
+      showMessage('Error', 'Employee email is missing.');
+      return;
+    }
+    if (newPassword.trim().length < 6) {
+      showMessage('Weak Password', 'Password must be at least 6 characters.');
+      return;
+    }
+
+    try {
+      await adminSetPasswordByEmail(targetEmail, newPassword.trim());
+      setNewPassword('');
+      showMessage('Success', 'Password updated.');
+    } catch (e: any) {
+      showMessage('Error', e?.message || 'Failed to update password.');
+    }
+  };
+
   const handleSave = async () => {
     if (!id) {
       showMessage('Error', 'Employee id is missing.');
@@ -72,6 +130,18 @@ const EditEmployeeScreen = () => {
         address,
         jobType: job,
       });
+
+      if (newPassword.trim()) {
+        if (!canChangeOwnPassword || !auth.currentUser) {
+          showMessage('Password', 'To reset employee password, use "Reset Password" button.');
+        } else if (newPassword.trim().length < 6) {
+          showMessage('Weak Password', 'Password must be at least 6 characters.');
+        } else {
+          await updatePassword(auth.currentUser, newPassword.trim());
+          setNewPassword('');
+        }
+      }
+
       showMessage('Success', 'Employee updated successfully.');
       router.replace('/');
     } catch (error: any) {
@@ -161,11 +231,40 @@ const EditEmployeeScreen = () => {
           />
         </View>
 
-        {/* Upload */}
-        <TouchableOpacity style={styles.upload}>
-          <Text style={styles.uploadText}>Add a photo</Text>
-          <Ionicons name="cloud-upload-outline" size={20} color={COLORS.primary} />
-        </TouchableOpacity>
+        {/* Password (current user only) */}
+        {canChangeOwnPassword ? (
+          <View style={styles.inputBox}>
+            <Ionicons name="lock-closed-outline" size={20} color={COLORS.textSecondary} />
+            <TextInput
+              placeholder="New password"
+              style={styles.input}
+              value={newPassword}
+              onChangeText={setNewPassword}
+              secureTextEntry
+              autoCapitalize="none"
+            />
+          </View>
+        ) : isAdmin ? (
+          <>
+            <View style={styles.inputBox}>
+              <Ionicons name="lock-closed-outline" size={20} color={COLORS.textSecondary} />
+              <TextInput
+                placeholder="Set new password (admin)"
+                style={styles.input}
+                value={newPassword}
+                onChangeText={setNewPassword}
+                secureTextEntry
+                autoCapitalize="none"
+              />
+            </View>
+
+            <View style={styles.passwordButtons}>
+              <TouchableOpacity style={styles.setPassword} onPress={handleAdminSetPassword} disabled={loading}>
+                <Text style={styles.setPasswordText}>Save Password</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        ) : null}
 
         {/* Buttons */}
         <View style={styles.buttons}>
@@ -220,17 +319,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  upload: {
+  passwordButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: COLORS.accent,
+    gap: 10,
+    marginTop: 0,
+    marginBottom: 15,
+  },
+  setPassword: {
+    flex: 1,
+    backgroundColor: COLORS.primary,
     padding: 14,
     borderRadius: 12,
-    marginTop: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-
-  uploadText: {
-    color: COLORS.textPrimary,
+  setPasswordText: {
+    color: COLORS.surface,
+    fontWeight: '900',
   },
 
   buttons: {
